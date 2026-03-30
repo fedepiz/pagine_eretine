@@ -19,6 +19,7 @@ use tower_http::{cors::CorsLayer, services::ServeDir};
 
 const PAGES_DIR: &str = "pages";
 const PAGE_MEDIA_DIR: &str = "pages/media";
+const PORT: u16 = 23051;
 
 #[derive(Clone)]
 struct AppState {
@@ -111,7 +112,7 @@ async fn main() {
     let port = std::env::var("PORT")
         .ok()
         .and_then(|value| value.parse::<u16>().ok())
-        .unwrap_or(3000);
+        .unwrap_or(PORT);
 
     let address = SocketAddr::from(([127, 0, 0, 1], port));
     let listener = tokio::net::TcpListener::bind(address)

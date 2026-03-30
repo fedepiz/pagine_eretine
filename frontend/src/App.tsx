@@ -127,7 +127,7 @@ function HomePage() {
 
       {status === 'error' && (
         <section className="notice notice-error">
-          Impossibile raggiungere il backend. Avvia l'API Rust sulla porta 3000 e aggiorna.
+          Impossibile raggiungere il backend. Avvia l'API Rust sulla porta 23051 e aggiorna.
         </section>
       )}
 
