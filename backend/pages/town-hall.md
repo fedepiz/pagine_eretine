@@ -3,6 +3,7 @@ title: Comune e Servizi
 summary: Orari di apertura, punti di contatto e pratiche gestibili allo sportello civico.
 category: Servizi pubblici
 updated_at: 2026-03-30
+cover-image: test-image.webp
 highlights:
   - Anagrafe e certificati
   - Supporto prenotazioni e orari senza appuntamento

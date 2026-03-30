@@ -6,6 +6,7 @@ use axum::{
 };
 use notify::{Event, EventKind, RecursiveMode, Watcher};
 use serde::{Deserialize, Serialize};
+use slotmap::{SlotMap, new_key_type};
 use std::{
     collections::{HashMap, HashSet},
     fs,
@@ -18,7 +19,7 @@ use tokio::time::Duration;
 use tower_http::{cors::CorsLayer, services::ServeDir};
 
 const PAGES_DIR: &str = "pages";
-const PAGE_MEDIA_DIR: &str = "pages/media";
+const PAGE_MEDIA_DIR: &str = "media";
 const PORT: u16 = 23051;
 
 #[derive(Clone)]
@@ -26,14 +27,26 @@ struct AppState {
     page_store: Arc<RwLock<PageStore>>,
 }
 
+new_key_type! { struct PageId; }
+
+#[derive(Default)]
 struct PageStore {
-    pages: Vec<Page>,
-    pages_by_slug: HashMap<String, Page>,
+    pages: SlotMap<PageId, Page>,
+    by_slug: HashMap<String, PageId>,
 }
 
-enum PageReloadChange {
-    Upsert(Page),
-    Remove(String),
+impl PageStore {
+    pub fn insert(&mut self, page: Page) {
+        let id = self.by_slug.get(&page.slug).copied();
+        match id {
+            Some(id) => self.pages[id] = page,
+            None => {
+                let key = page.slug.clone();
+                let id = self.pages.insert(page);
+                self.by_slug.insert(key, id);
+            }
+        }
+    }
 }
 
 #[derive(Clone, Serialize)]
@@ -43,6 +56,7 @@ struct PageSummary {
     summary: String,
     category: String,
     updated_at: String,
+    cover_image: Option<String>,
 }
 
 #[derive(Clone, Serialize)]
@@ -70,7 +84,7 @@ struct PageFrontMatter {
     summary: String,
     category: String,
     updated_at: String,
-    #[serde(default)]
+    #[serde(default, alias = "cover-image")]
     cover_image: Option<String>,
     #[serde(default)]
     reading_time_min: Option<u8>,
@@ -87,15 +101,13 @@ async fn main() {
     let pages = load_pages_from_dir(&pages_directory)
         .unwrap_or_else(|error| panic!("Failed to load markdown pages: {error}"));
 
+    let mut page_store = PageStore::default();
+    for page in pages {
+        page_store.insert(page);
+    }
+
     let app_state = AppState {
-        page_store: Arc::new(RwLock::new(PageStore {
-            pages_by_slug: pages
-                .iter()
-                .cloned()
-                .map(|page| (page.slug.clone(), page))
-                .collect(),
-            pages,
-        })),
+        page_store: Arc::new(RwLock::new(page_store)),
     };
 
     spawn_pages_watcher(app_state.clone(), pages_directory);
@@ -151,13 +163,14 @@ async fn list_pages(
 
     let summaries = page_store
         .pages
-        .iter()
+        .values()
         .map(|page| PageSummary {
             slug: page.slug.clone(),
             title: page.title.clone(),
             summary: page.summary.clone(),
             category: page.category.clone(),
             updated_at: page.updated_at.clone(),
+            cover_image: page.cover_image.clone(),
         })
         .collect();
 
@@ -168,11 +181,12 @@ async fn get_page(
     Path(slug): Path<String>,
     axum::extract::State(state): axum::extract::State<AppState>,
 ) -> Result<Json<Page>, StatusCode> {
-    let page_store = state.page_store.read().await;
+    let store = state.page_store.read().await;
 
-    let page = page_store
-        .pages_by_slug
+    let page = store
+        .by_slug
         .get(&slug)
+        .and_then(|&id| store.pages.get(id))
         .cloned()
         .ok_or(StatusCode::NOT_FOUND)?;
 
@@ -280,22 +294,27 @@ async fn reload_affected_pages(
     pages_directory: &FsPath,
     affected_slugs: &HashSet<String>,
 ) {
+    enum OnReload {
+        Upsert(Page),
+        Remove(String),
+    }
+
     let mut planned_changes = Vec::new();
 
     for slug in affected_slugs {
         let page_path = pages_directory.join(format!("{slug}.md"));
 
         if !page_path.is_file() {
-            planned_changes.push(PageReloadChange::Remove(slug.clone()));
+            planned_changes.push(OnReload::Remove(slug.clone()));
             continue;
         }
 
         match load_page_from_file(&page_path) {
             Ok(Some(page)) => {
-                planned_changes.push(PageReloadChange::Upsert(page));
+                planned_changes.push(OnReload::Upsert(page));
             }
             Ok(None) => {
-                planned_changes.push(PageReloadChange::Remove(slug.clone()));
+                planned_changes.push(OnReload::Remove(slug.clone()));
             }
             Err(error) => {
                 eprintln!("Failed to reload '{}': {error}", page_path.display());
@@ -313,12 +332,12 @@ async fn reload_affected_pages(
 
     for change in planned_changes {
         match change {
-            PageReloadChange::Upsert(page) => {
-                page_store.pages_by_slug.insert(page.slug.clone(), page);
+            OnReload::Upsert(page) => {
+                page_store.insert(page);
                 upserted += 1;
             }
-            PageReloadChange::Remove(slug) => {
-                if page_store.pages_by_slug.remove(&slug).is_some() {
+            OnReload::Remove(slug) => {
+                if page_store.by_slug.remove(&slug).is_some() {
                     removed += 1;
                 }
             }
@@ -329,18 +348,10 @@ async fn reload_affected_pages(
         return;
     }
 
-    page_store.pages = build_sorted_pages(&page_store.pages_by_slug);
-
     println!(
         "Reloaded affected pages dynamically (updated: {upserted}, removed: {removed}, total: {}).",
         page_store.pages.len()
     );
-}
-
-fn build_sorted_pages(pages_by_slug: &HashMap<String, Page>) -> Vec<Page> {
-    let mut pages = pages_by_slug.values().cloned().collect::<Vec<_>>();
-    sort_pages(&mut pages);
-    pages
 }
 
 fn is_markdown_path(path: &FsPath) -> bool {

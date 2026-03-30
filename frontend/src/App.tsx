@@ -45,10 +45,10 @@ interface PageSummary {
   summary: string
   category: string
   updated_at: string
+  cover_image?: string | null
 }
 
 interface Page extends PageSummary {
-  cover_image?: string | null
   reading_time_min: number
   highlights: string[]
   content_md: string
@@ -64,6 +64,43 @@ async function apiFetch<T>(path: string): Promise<T> {
   }
 
   return response.json() as Promise<T>
+}
+
+function resolveCoverImageSrc(rawValue: string): string {
+  const value = rawValue.trim()
+
+  if (!value) {
+    return value
+  }
+
+  if (/^(?:https?:)?\/\//i.test(value) || value.startsWith('data:') || value.startsWith('blob:')) {
+    return value
+  }
+
+  if (value.startsWith('/')) {
+    try {
+      return new URL(value, window.location.origin).toString()
+    } catch {
+      return value
+    }
+  }
+
+  if (value.startsWith('api/')) {
+    try {
+      return new URL(`/${value}`, window.location.origin).toString()
+    } catch {
+      return value
+    }
+  }
+
+  const normalizedPath = value.startsWith('media/') ? value : `media/${value}`
+
+  try {
+    const baseUrl = new URL(`${API_BASE_URL}/`, window.location.origin)
+    return new URL(normalizedPath, baseUrl).toString()
+  } catch {
+    return value
+  }
 }
 
 function formatDate(value: string): string {
@@ -133,22 +170,34 @@ function HomePage() {
 
       {status === 'ready' && (
         <section className="cards-grid" aria-label="Pagine in evidenza">
-          {featuredPages.map((page, index) => (
-            <article
-              className="page-card"
-              key={page.slug}
-              style={{ animationDelay: `${index * 90}ms` }}
-            >
-              <p className="page-card-meta">
-                {page.category} · Aggiornato {formatDate(page.updated_at)}
-              </p>
-              <h2>{page.title}</h2>
-              <p>{page.summary}</p>
-              <Link className="inline-link" to={`/p/${page.slug}`}>
-                Leggi articolo
-              </Link>
-            </article>
-          ))}
+          {featuredPages.map((page, index) => {
+            const coverImageSrc = page.cover_image ? resolveCoverImageSrc(page.cover_image) : null
+
+            return (
+              <article
+                className="page-card"
+                key={page.slug}
+                style={{ animationDelay: `${index * 90}ms` }}
+              >
+                {coverImageSrc && (
+                  <img
+                    alt={`Copertina di ${page.title}`}
+                    className="page-card-cover"
+                    loading="lazy"
+                    src={coverImageSrc}
+                  />
+                )}
+                <p className="page-card-meta">
+                  {page.category} · Aggiornato {formatDate(page.updated_at)}
+                </p>
+                <h2>{page.title}</h2>
+                <p>{page.summary}</p>
+                <Link className="inline-link" to={`/p/${page.slug}`}>
+                  Leggi articolo
+                </Link>
+              </article>
+            )
+          })}
         </section>
       )}
     </>
@@ -219,6 +268,8 @@ function ArticlePage() {
     )
   }
 
+  const coverImageSrc = page.cover_image ? resolveCoverImageSrc(page.cover_image) : null
+
   return (
     <article className="article-shell">
       <Link className="inline-link" to="/">
@@ -231,9 +282,7 @@ function ArticlePage() {
         <p className="lead">{page.summary}</p>
       </header>
 
-      {page.cover_image && (
-        <img alt={page.title} className="article-cover" loading="lazy" src={page.cover_image} />
-      )}
+      {coverImageSrc && <img alt={page.title} className="article-cover" loading="lazy" src={coverImageSrc} />}
 
       <div className="article-meta">
         <span>Aggiornato {formatDate(page.updated_at)}</span>
