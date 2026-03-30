@@ -5,7 +5,32 @@ import rehypeSanitize from 'rehype-sanitize'
 import remarkGfm from 'remark-gfm'
 import './App.css'
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? '/api'
+function resolveApiBaseUrl(): string {
+  const configured = import.meta.env.VITE_API_BASE_URL?.trim()
+
+  if (!configured) {
+    return '/api'
+  }
+
+  const normalized = configured.replace(/\/+$/, '')
+
+  try {
+    const resolvedUrl = new URL(normalized, window.location.origin)
+    const isLocalApiHost = resolvedUrl.hostname === '127.0.0.1' || resolvedUrl.hostname === 'localhost'
+    const isLocalBrowserHost =
+      window.location.hostname === '127.0.0.1' || window.location.hostname === 'localhost'
+
+    if (isLocalApiHost && !isLocalBrowserHost) {
+      return '/api'
+    }
+  } catch {
+    return '/api'
+  }
+
+  return normalized
+}
+
+const API_BASE_URL = resolveApiBaseUrl()
 
 type HomeStatus = 'loading' | 'ready' | 'error'
 type ArticleStatus = 'loading' | 'ready' | 'not-found' | 'error'
