@@ -3,10 +3,7 @@ title: Passeggiata nel Centro Storico
 summary: Un percorso rapido tra luoghi simbolo, panorami e vie artigiane del borgo antico.
 category: Cultura
 updated_at: 2026-03-27
-highlights:
-  - Belvedere panoramico
-  - Soste tra botteghe e cibo locale
-  - Targhe con note sulla storia locale
+cover-image: test-image.webp
 ---
 
 Parti da Piazza del Popolo e segui la salita dolce verso il belvedere panoramico. Lungo il percorso, i vicoli svelano botteghe, forni locali e facciate restaurate.

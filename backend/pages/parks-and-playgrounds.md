@@ -3,10 +3,7 @@ title: Parchi e Aree Gioco
 summary: Spazi verdi per famiglie, passeggiate brevi e pause all'ombra nelle giornate calde.
 category: All'aperto
 updated_at: 2026-03-24
-highlights:
-  - Percorso ad anello ombreggiato
-  - Aree gioco separate per eta
-  - Fontanelle e panchine
+cover-image: parco-arcobaleno.png
 ---
 
 Il parco comunale include un percorso ad anello adatto ai passeggini e alla corsa leggera. Le panchine sono distribuite lungo i tratti ombreggiati, con fontanelle nelle vicinanze.

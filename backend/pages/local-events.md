@@ -3,10 +3,7 @@ title: Calendario Eventi Stagionali
 summary: Feste ricorrenti, piccoli concerti e iniziative di comunita durante l'anno.
 category: Comunita
 updated_at: 2026-03-22
-highlights:
-  - Serate culturali all'aperto
-  - Percorsi enogastronomici autunnali
-  - Avvisi eventi del Comune
+cover-image: festa-cittadina.webp
 ---
 
 Tra primavera e inizio estate si tengono serate culturali all'aperto e mercatini artigianali nel fine settimana. La maggior parte degli eventi si svolge attorno alle piazze centrali e nei cortili adiacenti.

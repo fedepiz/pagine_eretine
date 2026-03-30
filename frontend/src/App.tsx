@@ -50,7 +50,6 @@ interface PageSummary {
 
 interface Page extends PageSummary {
   reading_time_min: number
-  highlights: string[]
   content_md: string
 }
 
@@ -177,16 +176,18 @@ function HomePage() {
               <article
                 className="page-card"
                 key={page.slug}
-                style={{ animationDelay: `${index * 90}ms` }}
+                style={
+                  coverImageSrc
+                    ? {
+                      animationDelay: `${index * 90}ms`,
+                      backgroundImage: `linear-gradient(160deg, rgba(255, 255, 255, 0.8), rgba(255, 255, 255, 0.8)), url("${coverImageSrc}")`,
+                      backgroundSize: 'cover',
+                      backgroundPosition: 'center',
+                      backgroundRepeat: 'no-repeat',
+                    }
+                    : { animationDelay: `${index * 90}ms` }
+                }
               >
-                {coverImageSrc && (
-                  <img
-                    alt={`Copertina di ${page.title}`}
-                    className="page-card-cover"
-                    loading="lazy"
-                    src={coverImageSrc}
-                  />
-                )}
                 <p className="page-card-meta">
                   {page.category} · Aggiornato {formatDate(page.updated_at)}
                 </p>
@@ -294,15 +295,6 @@ function ArticlePage() {
           {page.content_md}
         </ReactMarkdown>
       </div>
-
-      <aside className="highlight-box">
-        <h2>Punti in evidenza</h2>
-        <ul>
-          {page.highlights.map((highlight) => (
-            <li key={highlight}>{highlight}</li>
-          ))}
-        </ul>
-      </aside>
     </article>
   )
 }

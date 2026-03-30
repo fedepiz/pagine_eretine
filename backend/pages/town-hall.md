@@ -3,11 +3,7 @@ title: Comune e Servizi
 summary: Orari di apertura, punti di contatto e pratiche gestibili allo sportello civico.
 category: Servizi pubblici
 updated_at: 2026-03-30
-cover-image: test-image.webp
-highlights:
-  - Anagrafe e certificati
-  - Supporto prenotazioni e orari senza appuntamento
-  - Sportello URP per i cittadini
+cover-image: comune-e-cigni.webp
 ---
 
 Il municipio ospita servizi anagrafici, atti pubblici e richieste per autorizzazioni locali. Lo sportello principale e aperto dal lunedi al venerdi dalle 8:30 alle 13:00, con una seconda apertura pomeridiana il martedi.

@@ -68,7 +68,6 @@ struct Page {
     updated_at: String,
     cover_image: Option<String>,
     reading_time_min: u8,
-    highlights: Vec<String>,
     content_md: String,
 }
 
@@ -446,12 +445,6 @@ fn load_page_from_file(path: &FsPath) -> Result<Option<Page>, String> {
             .map(|value| value.trim().to_string())
             .filter(|value| !value.is_empty()),
         reading_time_min,
-        highlights: front_matter
-            .highlights
-            .into_iter()
-            .map(|value| value.trim().to_string())
-            .filter(|value| !value.is_empty())
-            .collect(),
         content_md,
     }))
 }
