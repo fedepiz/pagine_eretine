@@ -1,5 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, NavLink, Route, Routes, useParams } from 'react-router-dom'
+import ReactMarkdown from 'react-markdown'
+import rehypeSanitize from 'rehype-sanitize'
+import remarkGfm from 'remark-gfm'
 import './App.css'
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? '/api'
@@ -20,9 +23,10 @@ interface PageSummary {
 }
 
 interface Page extends PageSummary {
+  cover_image?: string | null
   reading_time_min: number
-  sections: string[]
   highlights: string[]
+  content_md: string
 }
 
 async function apiFetch<T>(path: string): Promise<T> {
@@ -44,7 +48,7 @@ function formatDate(value: string): string {
     return value
   }
 
-  return parsed.toLocaleDateString('en-GB', {
+  return parsed.toLocaleDateString('it-IT', {
     day: 'numeric',
     month: 'short',
     year: 'numeric',
@@ -85,34 +89,25 @@ function HomePage() {
   return (
     <>
       <section className="hero-panel">
-        <p className="eyebrow">Town knowledge hub</p>
-        <h1>Explore Monterotondo, one QR code at a time.</h1>
+        <p className="eyebrow">Hub cittadino</p>
+        <h1>Scopri Monterotondo, un QR alla volta.</h1>
         <p className="lead">
-          This starter app serves wiki-like pages from an Axum backend. Scan a QR code,
-          open an article route, and get local context in seconds.
+          Scansiona un codice QR, o seleziona una pagina qui sotto.
         </p>
-        <div className="hero-actions">
-          <Link
-            className="button button-primary"
-            to={featuredPages[0] ? `/p/${featuredPages[0].slug}` : '/'}
-          >
-            Open sample article
-          </Link>
-        </div>
       </section>
 
       {status === 'loading' && (
-        <section className="notice">Loading page highlights from the API...</section>
+        <section className="notice">Caricamento pagine in evidenza dall'API...</section>
       )}
 
       {status === 'error' && (
         <section className="notice notice-error">
-          Could not reach the backend. Start Rust API on port 3000 and refresh.
+          Impossibile raggiungere il backend. Avvia l'API Rust sulla porta 3000 e aggiorna.
         </section>
       )}
 
       {status === 'ready' && (
-        <section className="cards-grid" aria-label="Highlighted pages">
+        <section className="cards-grid" aria-label="Pagine in evidenza">
           {featuredPages.map((page, index) => (
             <article
               className="page-card"
@@ -120,12 +115,12 @@ function HomePage() {
               style={{ animationDelay: `${index * 90}ms` }}
             >
               <p className="page-card-meta">
-                {page.category} · Updated {formatDate(page.updated_at)}
+                {page.category} · Aggiornato {formatDate(page.updated_at)}
               </p>
               <h2>{page.title}</h2>
               <p>{page.summary}</p>
               <Link className="inline-link" to={`/p/${page.slug}`}>
-                Read article
+                Leggi articolo
               </Link>
             </article>
           ))}
@@ -174,19 +169,19 @@ function ArticlePage() {
   if (missingSlug) {
     return (
       <section className="notice notice-error">
-        Page not found. Return to <Link to="/">the home page</Link>.
+        Pagina non trovata. Torna alla <Link to="/">pagina iniziale</Link>.
       </section>
     )
   }
 
   if (status === 'loading') {
-    return <section className="notice">Loading article...</section>
+    return <section className="notice">Caricamento articolo...</section>
   }
 
   if (status === 'not-found') {
     return (
       <section className="notice notice-error">
-        Page not found. Return to <Link to="/">the home page</Link>.
+        Pagina non trovata. Torna alla <Link to="/">pagina iniziale</Link>.
       </section>
     )
   }
@@ -194,7 +189,7 @@ function ArticlePage() {
   if (status === 'error' || !page) {
     return (
       <section className="notice notice-error">
-        Could not load this article right now. Please try again.
+        Impossibile caricare questo articolo adesso. Riprova.
       </section>
     )
   }
@@ -202,7 +197,7 @@ function ArticlePage() {
   return (
     <article className="article-shell">
       <Link className="inline-link" to="/">
-        ← Back to highlighted pages
+        ← Torna alle pagine in evidenza
       </Link>
 
       <header className="article-header">
@@ -211,20 +206,23 @@ function ArticlePage() {
         <p className="lead">{page.summary}</p>
       </header>
 
+      {page.cover_image && (
+        <img alt={page.title} className="article-cover" loading="lazy" src={page.cover_image} />
+      )}
+
       <div className="article-meta">
-        <span>Updated {formatDate(page.updated_at)}</span>
-        <span>{page.reading_time_min} min read</span>
-        <span>Slug: {page.slug}</span>
+        <span>Aggiornato {formatDate(page.updated_at)}</span>
+        <span>{page.reading_time_min} min di lettura</span>
       </div>
 
-      <div className="article-content">
-        {page.sections.map((section, index) => (
-          <p key={`${page.slug}-${index}`}>{section}</p>
-        ))}
+      <div className="article-content article-markdown">
+        <ReactMarkdown rehypePlugins={[rehypeSanitize]} remarkPlugins={[remarkGfm]}>
+          {page.content_md}
+        </ReactMarkdown>
       </div>
 
       <aside className="highlight-box">
-        <h2>Quick highlights</h2>
+        <h2>Punti in evidenza</h2>
         <ul>
           {page.highlights.map((highlight) => (
             <li key={highlight}>{highlight}</li>
@@ -238,7 +236,7 @@ function ArticlePage() {
 function NotFoundPage() {
   return (
     <section className="notice notice-error">
-      Unknown route. Try <Link to="/">the home page</Link>.
+      Percorso sconosciuto. Prova la <Link to="/">pagina iniziale</Link>.
     </section>
   )
 }
@@ -248,26 +246,18 @@ function App() {
     <div className="app-shell">
       <header className="top-bar">
         <Link className="brand" to="/">
-          Monterotondo Pages
+          Pagine Eretine
         </Link>
 
-        <nav className="top-nav" aria-label="Main navigation">
+        <nav className="top-nav" aria-label="Navigazione principale">
           <NavLink
             className={({ isActive }) =>
               isActive ? 'top-nav-link top-nav-link-active' : 'top-nav-link'
             }
             to="/"
           >
-            Home
+            Vai alla Home
           </NavLink>
-          <a
-            className="top-nav-link"
-            href={`${API_BASE_URL}/health`}
-            rel="noreferrer"
-            target="_blank"
-          >
-            API health
-          </a>
         </nav>
       </header>
 
@@ -281,8 +271,7 @@ function App() {
 
       <footer className="footer">
         <p>
-          Bootstrap version with synthetic data. Scan-ready routes live under
-          <code>/p/&lt;slug&gt;</code>.
+          Sviluppato da Rotari Club Monterotondo, 2026. Tutti i diritti riservati.
         </p>
       </footer>
     </div>

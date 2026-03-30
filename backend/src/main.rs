@@ -2,15 +2,37 @@ use axum::{
     Json, Router,
     extract::Path,
     http::{HeaderValue, Method, StatusCode},
-    routing::get,
+    routing::{get, get_service},
 };
-use serde::Serialize;
-use std::net::SocketAddr;
-use tower_http::cors::CorsLayer;
+use notify::{Event, EventKind, RecursiveMode, Watcher};
+use serde::{Deserialize, Serialize};
+use std::{
+    collections::{HashMap, HashSet},
+    fs,
+    net::SocketAddr,
+    path::{Path as FsPath, PathBuf},
+    sync::Arc,
+};
+use tokio::sync::RwLock;
+use tokio::time::Duration;
+use tower_http::{cors::CorsLayer, services::ServeDir};
+
+const PAGES_DIR: &str = "pages";
+const PAGE_MEDIA_DIR: &str = "pages/media";
 
 #[derive(Clone)]
 struct AppState {
+    page_store: Arc<RwLock<PageStore>>,
+}
+
+struct PageStore {
     pages: Vec<Page>,
+    pages_by_slug: HashMap<String, Page>,
+}
+
+enum PageReloadChange {
+    Upsert(Page),
+    Remove(String),
 }
 
 #[derive(Clone, Serialize)]
@@ -29,9 +51,10 @@ struct Page {
     summary: String,
     category: String,
     updated_at: String,
+    cover_image: Option<String>,
     reading_time_min: u8,
-    sections: Vec<String>,
     highlights: Vec<String>,
+    content_md: String,
 }
 
 #[derive(Serialize)]
@@ -40,19 +63,48 @@ struct HealthResponse {
     pages: usize,
 }
 
+#[derive(Deserialize)]
+struct PageFrontMatter {
+    title: String,
+    summary: String,
+    category: String,
+    updated_at: String,
+    #[serde(default)]
+    cover_image: Option<String>,
+    #[serde(default)]
+    reading_time_min: Option<u8>,
+    #[serde(default)]
+    highlights: Vec<String>,
+    #[serde(default)]
+    published: Option<bool>,
+}
+
 #[tokio::main]
 async fn main() {
-    let pages = synthetic_pages();
+    let pages_directory = PathBuf::from(PAGES_DIR);
+
+    let pages = load_pages_from_dir(&pages_directory)
+        .unwrap_or_else(|error| panic!("Failed to load markdown pages: {error}"));
 
     let app_state = AppState {
-        pages: pages.clone(),
+        page_store: Arc::new(RwLock::new(PageStore {
+            pages_by_slug: pages
+                .iter()
+                .cloned()
+                .map(|page| (page.slug.clone(), page))
+                .collect(),
+            pages,
+        })),
     };
+
+    spawn_pages_watcher(app_state.clone(), pages_directory);
 
     let app = Router::new()
         .route("/", get(root))
         .route("/api/health", get(health))
         .route("/api/pages", get(list_pages))
         .route("/api/pages/{slug}", get(get_page))
+        .nest_service("/api/media", get_service(ServeDir::new(PAGE_MEDIA_DIR)))
         .with_state(app_state)
         .layer(cors_layer());
 
@@ -83,16 +135,20 @@ async fn root() -> &'static str {
 async fn health(
     axum::extract::State(state): axum::extract::State<AppState>,
 ) -> Json<HealthResponse> {
+    let page_store = state.page_store.read().await;
+
     Json(HealthResponse {
         status: "ok",
-        pages: state.pages.len(),
+        pages: page_store.pages.len(),
     })
 }
 
 async fn list_pages(
     axum::extract::State(state): axum::extract::State<AppState>,
 ) -> Json<Vec<PageSummary>> {
-    let summaries = state
+    let page_store = state.page_store.read().await;
+
+    let summaries = page_store
         .pages
         .iter()
         .map(|page| PageSummary {
@@ -111,10 +167,11 @@ async fn get_page(
     Path(slug): Path<String>,
     axum::extract::State(state): axum::extract::State<AppState>,
 ) -> Result<Json<Page>, StatusCode> {
-    let page = state
-        .pages
-        .iter()
-        .find(|page| page.slug == slug)
+    let page_store = state.page_store.read().await;
+
+    let page = page_store
+        .pages_by_slug
+        .get(&slug)
         .cloned()
         .ok_or(StatusCode::NOT_FOUND)?;
 
@@ -127,100 +184,377 @@ fn cors_layer() -> CorsLayer {
             HeaderValue::from_static("http://localhost:5173"),
             HeaderValue::from_static("http://127.0.0.1:5173"),
         ])
-        .allow_methods([Method::GET])
+        .allow_methods([Method::GET, Method::HEAD])
 }
 
-fn synthetic_pages() -> Vec<Page> {
-    vec![
-        Page {
-            slug: "town-hall".to_string(),
-            title: "Town Hall and Public Services".to_string(),
-            summary: "Opening hours, contact points, and what can be handled at the civic desk.".to_string(),
-            category: "Public services".to_string(),
-            updated_at: "2026-03-30".to_string(),
-            reading_time_min: 4,
-            sections: vec![
-                "The town hall hosts registry services, public records, and local permit requests. Main desk hours are Monday to Friday from 8:30 to 13:00, with a second afternoon opening on Tuesdays.".to_string(),
-                "Several services can be pre-booked online: residence certificates, family status extracts, and identity card appointments. Walk-ins are still accepted in low-traffic hours.".to_string(),
-                "The URP information desk helps route requests to the right office and can support first-time visitors with forms and basic documentation guidance.".to_string(),
-            ],
-            highlights: vec![
-                "Registry and certificates".to_string(),
-                "Booking support and walk-in hours".to_string(),
-                "URP citizen help desk".to_string(),
-            ],
-        },
-        Page {
-            slug: "historic-center".to_string(),
-            title: "Historic Center Walk".to_string(),
-            summary: "A quick route through landmarks, viewpoints, and artisan streets in the old town.".to_string(),
-            category: "Culture".to_string(),
-            updated_at: "2026-03-27".to_string(),
-            reading_time_min: 6,
-            sections: vec![
-                "Start from Piazza del Popolo and follow the gentle climb to the panoramic terrace. Along the way, small alleys reveal workshops, local bakeries, and restored facades.".to_string(),
-                "Many buildings show layered architecture from medieval and modern phases. Informational plaques explain key dates and notable restorations.".to_string(),
-                "The walk can be completed in around 45 minutes, but most visitors stop for photos and cafés, extending it to a relaxed afternoon route.".to_string(),
-            ],
-            highlights: vec![
-                "Panoramic terrace viewpoint".to_string(),
-                "Craft and food stops".to_string(),
-                "Plaques with local history notes".to_string(),
-            ],
-        },
-        Page {
-            slug: "weekly-market".to_string(),
-            title: "Weekly Market Guide".to_string(),
-            summary: "Where it takes place, best arrival time, and what you can usually find.".to_string(),
-            category: "Daily life".to_string(),
-            updated_at: "2026-03-25".to_string(),
-            reading_time_min: 5,
-            sections: vec![
-                "The market sets up every Thursday morning across the central parking area and nearby side streets. Stalls begin opening before 8:00 and remain active until around 13:00.".to_string(),
-                "Typical offers include fresh produce, regional cheeses, household supplies, clothing basics, and occasional seasonal goods from nearby towns.".to_string(),
-                "Early hours are best for full selection, while late morning is ideal for a calmer visit. Reusable bags are recommended since many stalls reduce plastic packaging.".to_string(),
-            ],
-            highlights: vec![
-                "Thursday morning schedule".to_string(),
-                "Food, home goods, and essentials".to_string(),
-                "Best times for selection vs. comfort".to_string(),
-            ],
-        },
-        Page {
-            slug: "parks-and-playgrounds".to_string(),
-            title: "Parks and Playgrounds".to_string(),
-            summary: "Green areas for families, short walks, and shaded breaks during warm days.".to_string(),
-            category: "Outdoor".to_string(),
-            updated_at: "2026-03-24".to_string(),
-            reading_time_min: 4,
-            sections: vec![
-                "The municipal park includes a loop path suitable for strollers and light jogging. Benches are distributed along shaded sections with water points nearby.".to_string(),
-                "Two playground clusters are available: one for younger children with soft flooring, and a second zone with climbing elements for older kids.".to_string(),
-                "Weekend mornings usually host sports groups and family activities, while weekday afternoons remain the quietest period.".to_string(),
-            ],
-            highlights: vec![
-                "Shaded loop path".to_string(),
-                "Separate play areas by age".to_string(),
-                "Water points and benches".to_string(),
-            ],
-        },
-        Page {
-            slug: "local-events".to_string(),
-            title: "Seasonal Events Calendar".to_string(),
-            summary: "Recurring festivals, small concerts, and community events throughout the year.".to_string(),
-            category: "Community".to_string(),
-            updated_at: "2026-03-22".to_string(),
-            reading_time_min: 5,
-            sections: vec![
-                "Spring and early summer host open-air cultural evenings and weekend craft fairs. Most events take place around the central squares and adjacent courtyards.".to_string(),
-                "Autumn weekends often include food routes and local product tastings, coordinated with neighborhood associations and volunteer groups.".to_string(),
-                "Major events are announced in advance, while smaller gatherings can appear with shorter notice through municipal channels.".to_string(),
-            ],
-            highlights: vec![
-                "Open-air culture nights".to_string(),
-                "Autumn food routes".to_string(),
-                "Municipal event announcements".to_string(),
-            ],
-        },
-    ]
+fn spawn_pages_watcher(state: AppState, pages_directory: PathBuf) {
+    tokio::spawn(async move {
+        let (event_tx, mut event_rx) =
+            tokio::sync::mpsc::unbounded_channel::<notify::Result<Event>>();
+
+        let mut watcher = match notify::recommended_watcher(move |event| {
+            let _ = event_tx.send(event);
+        }) {
+            Ok(watcher) => watcher,
+            Err(error) => {
+                eprintln!("Failed to initialize markdown watcher: {error}");
+                return;
+            }
+        };
+
+        if let Err(error) = watcher.watch(&pages_directory, RecursiveMode::NonRecursive) {
+            eprintln!(
+                "Failed to watch markdown directory '{}': {error}",
+                pages_directory.display()
+            );
+            return;
+        }
+
+        println!(
+            "Watching '{}' for markdown page changes.",
+            pages_directory.display()
+        );
+
+        loop {
+            let Some(event_result) = event_rx.recv().await else {
+                break;
+            };
+
+            let mut affected_slugs = HashSet::new();
+            collect_affected_slugs(&event_result, &mut affected_slugs);
+
+            if affected_slugs.is_empty() {
+                continue;
+            }
+
+            tokio::time::sleep(Duration::from_millis(250)).await;
+
+            while let Ok(queued_result) = event_rx.try_recv() {
+                collect_affected_slugs(&queued_result, &mut affected_slugs);
+            }
+
+            reload_affected_pages(&state, &pages_directory, &affected_slugs).await;
+        }
+    });
+}
+
+fn collect_affected_slugs(
+    event_result: &notify::Result<Event>,
+    affected_slugs: &mut HashSet<String>,
+) {
+    let event = match event_result {
+        Ok(event) => event,
+        Err(error) => {
+            eprintln!("Markdown watcher error: {error}");
+            return;
+        }
+    };
+
+    if !matches!(
+        event.kind,
+        EventKind::Create(_) | EventKind::Modify(_) | EventKind::Remove(_) | EventKind::Any
+    ) {
+        return;
+    }
+
+    for path in &event.paths {
+        if !is_markdown_path(path) {
+            continue;
+        }
+
+        let Some(slug) = path
+            .file_stem()
+            .and_then(|value| value.to_str())
+            .map(|value| value.to_string())
+        else {
+            continue;
+        };
+
+        affected_slugs.insert(slug);
+    }
+}
+
+async fn reload_affected_pages(
+    state: &AppState,
+    pages_directory: &FsPath,
+    affected_slugs: &HashSet<String>,
+) {
+    let mut planned_changes = Vec::new();
+
+    for slug in affected_slugs {
+        let page_path = pages_directory.join(format!("{slug}.md"));
+
+        if !page_path.is_file() {
+            planned_changes.push(PageReloadChange::Remove(slug.clone()));
+            continue;
+        }
+
+        match load_page_from_file(&page_path) {
+            Ok(Some(page)) => {
+                planned_changes.push(PageReloadChange::Upsert(page));
+            }
+            Ok(None) => {
+                planned_changes.push(PageReloadChange::Remove(slug.clone()));
+            }
+            Err(error) => {
+                eprintln!("Failed to reload '{}': {error}", page_path.display());
+            }
+        }
+    }
+
+    if planned_changes.is_empty() {
+        return;
+    }
+
+    let mut page_store = state.page_store.write().await;
+    let mut upserted = 0usize;
+    let mut removed = 0usize;
+
+    for change in planned_changes {
+        match change {
+            PageReloadChange::Upsert(page) => {
+                page_store.pages_by_slug.insert(page.slug.clone(), page);
+                upserted += 1;
+            }
+            PageReloadChange::Remove(slug) => {
+                if page_store.pages_by_slug.remove(&slug).is_some() {
+                    removed += 1;
+                }
+            }
+        }
+    }
+
+    if upserted == 0 && removed == 0 {
+        return;
+    }
+
+    page_store.pages = build_sorted_pages(&page_store.pages_by_slug);
+
+    println!(
+        "Reloaded affected pages dynamically (updated: {upserted}, removed: {removed}, total: {}).",
+        page_store.pages.len()
+    );
+}
+
+fn build_sorted_pages(pages_by_slug: &HashMap<String, Page>) -> Vec<Page> {
+    let mut pages = pages_by_slug.values().cloned().collect::<Vec<_>>();
+    sort_pages(&mut pages);
+    pages
+}
+
+fn is_markdown_path(path: &FsPath) -> bool {
+    path.extension()
+        .and_then(|value| value.to_str())
+        .is_some_and(|value| value.eq_ignore_ascii_case("md"))
+}
+
+fn load_pages_from_dir(directory: &FsPath) -> Result<Vec<Page>, String> {
+    let entries = fs::read_dir(directory).map_err(|error| {
+        format!(
+            "Could not read '{}' directory: {error}",
+            directory.display()
+        )
+    })?;
+
+    let mut pages = Vec::new();
+    let mut seen_slugs = HashSet::new();
+
+    for entry in entries {
+        let entry = entry.map_err(|error| format!("Failed to read directory entry: {error}"))?;
+        let path = entry.path();
+
+        if !path.is_file() || !is_markdown_path(&path) {
+            continue;
+        }
+
+        let Some(page) = load_page_from_file(&path)? else {
+            continue;
+        };
+
+        if !seen_slugs.insert(page.slug.clone()) {
+            return Err(format!(
+                "Duplicate slug '{}' found in markdown pages.",
+                page.slug
+            ));
+        }
+
+        pages.push(page);
+    }
+
+    sort_pages(&mut pages);
+
+    Ok(pages)
+}
+
+fn load_page_from_file(path: &FsPath) -> Result<Option<Page>, String> {
+    let slug = path
+        .file_stem()
+        .and_then(|value| value.to_str())
+        .ok_or_else(|| format!("Invalid page filename '{}'.", path.display()))?
+        .to_string();
+
+    validate_slug(&slug).map_err(|message| format!("{} ({})", message, path.display()))?;
+
+    let raw_markdown = fs::read_to_string(path)
+        .map_err(|error| format!("Failed to read '{}': {error}", path.display()))?;
+
+    let (front_matter_raw, body_raw) = split_front_matter(&raw_markdown)
+        .map_err(|message| format!("{} ({})", message, path.display()))?;
+
+    let front_matter: PageFrontMatter = serde_yaml::from_str(&front_matter_raw)
+        .map_err(|error| format!("Invalid front matter in '{}': {error}", path.display()))?;
+
+    if front_matter.published == Some(false) {
+        return Ok(None);
+    }
+
+    validate_front_matter(&front_matter, path)?;
+
+    let content_md = body_raw.trim().to_string();
+    if content_md.is_empty() {
+        return Err(format!(
+            "Markdown body cannot be empty in '{}'.",
+            path.display()
+        ));
+    }
+
+    let reading_time_min = front_matter
+        .reading_time_min
+        .unwrap_or_else(|| estimate_reading_time_minutes(&content_md))
+        .max(1);
+
+    Ok(Some(Page {
+        slug,
+        title: front_matter.title.trim().to_string(),
+        summary: front_matter.summary.trim().to_string(),
+        category: front_matter.category.trim().to_string(),
+        updated_at: front_matter.updated_at.trim().to_string(),
+        cover_image: front_matter
+            .cover_image
+            .map(|value| value.trim().to_string())
+            .filter(|value| !value.is_empty()),
+        reading_time_min,
+        highlights: front_matter
+            .highlights
+            .into_iter()
+            .map(|value| value.trim().to_string())
+            .filter(|value| !value.is_empty())
+            .collect(),
+        content_md,
+    }))
+}
+
+fn sort_pages(pages: &mut [Page]) {
+    pages.sort_by(|a, b| {
+        b.updated_at
+            .cmp(&a.updated_at)
+            .then_with(|| a.slug.cmp(&b.slug))
+    });
+}
+
+fn split_front_matter(raw_markdown: &str) -> Result<(String, String), String> {
+    let mut lines = raw_markdown.lines();
+
+    let Some(first_line) = lines.next() else {
+        return Err("Markdown file is empty.".to_string());
+    };
+
+    if first_line.trim_end_matches('\r') != "---" {
+        return Err("Markdown file must start with YAML front matter delimiter '---'.".to_string());
+    }
+
+    let mut front_matter_lines = Vec::new();
+    let mut found_closing_delimiter = false;
+
+    for line in &mut lines {
+        if line.trim_end_matches('\r') == "---" {
+            found_closing_delimiter = true;
+            break;
+        }
+
+        front_matter_lines.push(line.trim_end_matches('\r'));
+    }
+
+    if !found_closing_delimiter {
+        return Err("Front matter is missing a closing '---' delimiter.".to_string());
+    }
+
+    let body = lines
+        .map(|line| line.trim_end_matches('\r'))
+        .collect::<Vec<_>>()
+        .join("\n");
+
+    Ok((front_matter_lines.join("\n"), body))
+}
+
+fn validate_front_matter(front_matter: &PageFrontMatter, path: &FsPath) -> Result<(), String> {
+    if front_matter.title.trim().is_empty() {
+        return Err(format!(
+            "Missing required 'title' in front matter ({})",
+            path.display()
+        ));
+    }
+
+    if front_matter.summary.trim().is_empty() {
+        return Err(format!(
+            "Missing required 'summary' in front matter ({})",
+            path.display()
+        ));
+    }
+
+    if front_matter.category.trim().is_empty() {
+        return Err(format!(
+            "Missing required 'category' in front matter ({})",
+            path.display()
+        ));
+    }
+
+    if front_matter.updated_at.trim().is_empty() {
+        return Err(format!(
+            "Missing required 'updated_at' in front matter ({})",
+            path.display()
+        ));
+    }
+
+    Ok(())
+}
+
+fn validate_slug(slug: &str) -> Result<(), String> {
+    if slug.is_empty() {
+        return Err("Slug cannot be empty.".to_string());
+    }
+
+    if slug.starts_with('-') || slug.ends_with('-') {
+        return Err(format!(
+            "Slug '{slug}' cannot start or end with '-' characters."
+        ));
+    }
+
+    if slug.contains("--") {
+        return Err(format!(
+            "Slug '{slug}' cannot contain consecutive '-' characters."
+        ));
+    }
+
+    if !slug
+        .bytes()
+        .all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit() || byte == b'-')
+    {
+        return Err(format!(
+            "Slug '{slug}' must contain only lowercase letters, numbers, and '-'."
+        ));
+    }
+
+    Ok(())
+}
+
+fn estimate_reading_time_minutes(content_md: &str) -> u8 {
+    let words = content_md.split_whitespace().count();
+    if words == 0 {
+        return 1;
+    }
+
+    let minutes = ((words as f64) / 200.0).ceil() as usize;
+    let bounded = minutes.clamp(1, u8::MAX as usize);
+    bounded as u8
 }
