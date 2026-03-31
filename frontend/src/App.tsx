@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Link, NavLink, Route, Routes, useParams } from 'react-router-dom'
+import { Link, NavLink, Route, Routes, useLocation, useParams } from 'react-router-dom'
 import QRCode from 'qrcode'
 import ReactMarkdown from 'react-markdown'
 import rehypeSanitize from 'rehype-sanitize'
@@ -354,7 +354,7 @@ function ArticlePage() {
         </Link>
 
         <button
-          className="qr-download-button"
+          className="ui-button qr-download-button"
           disabled={qrStatus === 'downloading'}
           onClick={handleDownloadQrCode}
           type="button"
@@ -413,6 +413,9 @@ function NotFoundPage() {
 }
 
 function App() {
+  const location = useLocation()
+  const isHomePage = location.pathname === '/'
+
   return (
     <div className="app-shell">
       <header className="top-bar">
@@ -420,16 +423,18 @@ function App() {
           Pagine Eretine
         </Link>
 
-        <nav className="top-nav" aria-label="Navigazione principale">
-          <NavLink
-            className={({ isActive }) =>
-              isActive ? 'top-nav-link top-nav-link-active' : 'top-nav-link'
-            }
-            to="/"
-          >
-            Vai alla Home
-          </NavLink>
-        </nav>
+        {!isHomePage && (
+          <nav className="top-nav" aria-label="Navigazione principale">
+            <NavLink
+              className={({ isActive }) =>
+                isActive ? 'ui-button ui-button-active top-nav-link' : 'ui-button top-nav-link'
+              }
+              to="/"
+            >
+              Vai alla Home
+            </NavLink>
+          </nav>
+        )}
       </header>
 
       <main className="main-content">

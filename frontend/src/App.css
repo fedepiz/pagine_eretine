@@ -35,23 +35,42 @@
   gap: 0.6rem;
 }
 
-.top-nav-link,
-.top-nav-link:visited {
+.ui-button,
+.ui-button:visited {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   text-decoration: none;
   color: var(--ink);
-  padding: 0.45rem 0.75rem;
+  padding: 0.45rem 0.88rem;
   border-radius: 999px;
-  border: 1px solid transparent;
-  transition: border-color 0.2s ease, background-color 0.2s ease;
+  border: 1px solid var(--border);
+  background: var(--chip-bg);
+  font: inherit;
+  font-weight: 600;
+  line-height: 1.2;
+  cursor: pointer;
+  transition: transform 0.2s ease, border-color 0.2s ease, background-color 0.2s ease;
 }
 
-.top-nav-link:hover {
-  border-color: rgba(120, 110, 95, 0.25);
+.ui-button:hover:not(:disabled) {
+  transform: translateY(-1px);
+  border-color: rgba(130, 121, 103, 0.6);
+  background: rgba(164, 142, 117, 0.2);
 }
 
-.top-nav-link-active {
+.ui-button:disabled {
+  opacity: 0.72;
+  cursor: wait;
+}
+
+.ui-button-active {
   background: rgba(160, 132, 98, 0.14);
-  border-color: rgba(120, 110, 95, 0.25);
+  border-color: rgba(130, 121, 103, 0.6);
+}
+
+.top-nav-link {
+  padding-inline: 0.75rem;
 }
 
 .main-content {
@@ -148,29 +167,6 @@
   color: var(--ink);
   font-family: var(--heading-font);
   font-size: 1.08rem;
-}
-
-.interactive-map-locate {
-  border: 1px solid var(--border);
-  background: var(--chip-bg);
-  color: var(--ink);
-  border-radius: 999px;
-  padding: 0.45rem 0.88rem;
-  font: inherit;
-  font-weight: 600;
-  cursor: pointer;
-  transition: transform 0.2s ease, border-color 0.2s ease, background-color 0.2s ease;
-}
-
-.interactive-map-locate:hover:not(:disabled) {
-  transform: translateY(-1px);
-  border-color: rgba(130, 121, 103, 0.6);
-  background: rgba(164, 142, 117, 0.2);
-}
-
-.interactive-map-locate:disabled {
-  opacity: 0.72;
-  cursor: wait;
 }
 
 .interactive-map-canvas {
@@ -318,26 +314,7 @@
 }
 
 .qr-download-button {
-  border: 1px solid var(--border);
-  background: var(--chip-bg);
-  color: var(--ink);
-  border-radius: 999px;
   padding: 0.5rem 0.95rem;
-  font: inherit;
-  font-weight: 600;
-  cursor: pointer;
-  transition: transform 0.2s ease, border-color 0.2s ease, background-color 0.2s ease;
-}
-
-.qr-download-button:hover:not(:disabled) {
-  transform: translateY(-1px);
-  border-color: rgba(130, 121, 103, 0.6);
-  background: rgba(164, 142, 117, 0.2);
-}
-
-.qr-download-button:disabled {
-  opacity: 0.68;
-  cursor: wait;
 }
 
 .qr-download-error {

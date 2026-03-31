@@ -186,7 +186,7 @@ export function InteractiveMap({
 
         {showUserLocationControl && (
           <button
-            className="interactive-map-locate"
+            className="ui-button interactive-map-locate"
             disabled={geoStatus === 'locating'}
             onClick={handleLocateUser}
             type="button"
