@@ -57,6 +57,8 @@ struct PageSummary {
     category: String,
     updated_at: String,
     cover_image: Option<String>,
+    lat: f64,
+    lon: f64,
 }
 
 #[derive(Clone, Serialize)]
@@ -67,6 +69,8 @@ struct Page {
     category: String,
     updated_at: String,
     cover_image: Option<String>,
+    lat: f64,
+    lon: f64,
     reading_time_min: u8,
     content_md: String,
 }
@@ -88,7 +92,9 @@ struct PageFrontMatter {
     #[serde(default)]
     reading_time_min: Option<u8>,
     #[serde(default)]
-    highlights: Vec<String>,
+    lat: f64,
+    #[serde(default, alias = "long", alias = "lng")]
+    lon: f64,
     #[serde(default)]
     published: Option<bool>,
 }
@@ -170,6 +176,8 @@ async fn list_pages(
             category: page.category.clone(),
             updated_at: page.updated_at.clone(),
             cover_image: page.cover_image.clone(),
+            lat: page.lat,
+            lon: page.lon,
         })
         .collect();
 
@@ -444,6 +452,8 @@ fn load_page_from_file(path: &FsPath) -> Result<Option<Page>, String> {
             .cover_image
             .map(|value| value.trim().to_string())
             .filter(|value| !value.is_empty()),
+        lat: front_matter.lat,
+        lon: front_matter.lon,
         reading_time_min,
         content_md,
     }))

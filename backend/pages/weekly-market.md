@@ -3,6 +3,8 @@ title: Guida al Mercato Settimanale
 summary: Dove si svolge, quando conviene arrivare e cosa si trova di solito.
 category: Vita quotidiana
 updated_at: 2026-03-25
+lat: 42.04955
+long: 12.61381
 ---
 
 Il mercato si svolge ogni giovedi mattina nell'area del parcheggio centrale e nelle strade laterali vicine. I banchi iniziano ad aprire prima delle 8:00 e restano attivi fino alle 13:00 circa.

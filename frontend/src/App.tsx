@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Link, NavLink, Route, Routes, useParams } from 'react-router-dom'
+import { Link, NavLink, Route, Routes, useNavigate, useParams } from 'react-router-dom'
 import QRCode from 'qrcode'
 import ReactMarkdown from 'react-markdown'
 import rehypeSanitize from 'rehype-sanitize'
 import remarkGfm from 'remark-gfm'
+import { InteractiveMap } from './components/InteractiveMap'
+import type { MapPin } from './components/InteractiveMap'
 import './App.css'
 
 function resolveApiBaseUrl(): string {
@@ -50,6 +52,8 @@ interface PageSummary {
   category: string
   updated_at: string
   cover_image?: string | null
+  lat: number
+  lon: number
 }
 
 interface Page extends PageSummary {
@@ -152,6 +156,7 @@ function formatDate(value: string): string {
 }
 
 function HomePage() {
+  const navigate = useNavigate()
   const [pages, setPages] = useState<PageSummary[]>([])
   const [status, setStatus] = useState<HomeStatus>('loading')
 
@@ -181,6 +186,26 @@ function HomePage() {
   }, [])
 
   const featuredPages = useMemo(() => pages.slice(0, 6), [pages])
+  const mapPins = useMemo<MapPin[]>(
+    () =>
+      pages
+        .filter(
+          (page) =>
+            Number.isFinite(page.lat) &&
+            Number.isFinite(page.lon) &&
+            page.lat !== 0 &&
+            page.lon !== 0,
+        )
+        .map((page) => ({
+          id: `page-${page.slug}`,
+          name: page.title,
+          summary: page.summary,
+          slug: page.slug,
+          lat: page.lat,
+          lng: page.lon,
+        })),
+    [pages],
+  )
 
   return (
     <>
@@ -191,6 +216,10 @@ function HomePage() {
           Scansiona un codice QR, o seleziona una pagina qui sotto.
         </p>
       </section>
+
+      <InteractiveMap
+        pins={mapPins}
+      />
 
       {status === 'loading' && (
         <section className="notice">Caricamento pagine in evidenza dall'API...</section>
@@ -229,7 +258,7 @@ function HomePage() {
                 <h2>{page.title}</h2>
                 <p>{page.summary}</p>
                 <Link className="inline-link" to={`/p/${page.slug}`}>
-                  Leggi articolo
+                  Vai alla pagina
                 </Link>
               </article>
             )
