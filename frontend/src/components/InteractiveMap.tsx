@@ -180,9 +180,9 @@ export function InteractiveMap({
   }, [requestUserLocation, showUserLocationControl])
 
   return (
-    <section aria-label="Mappa interattiva" className="interactive-map-shell">
-      <div className="interactive-map-toolbar">
-        <p className="interactive-map-title">Mappa interattiva</p>
+    <section aria-label="Mappa interattiva" className="section-shell">
+      <div className="section-toolbar">
+        <p className="section-title">Mappa interattiva</p>
 
         {showUserLocationControl && (
           <button

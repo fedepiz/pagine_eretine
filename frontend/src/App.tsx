@@ -231,31 +231,36 @@ function HomePage() {
         }}
       />
 
-      {status === 'loading' && (
-        <section className="notice">Caricamento pagine in evidenza dall'API...</section>
-      )}
+      <section aria-label="In Evidenza" className="section-shell">
+        <div className="section-toolbar">
+          <p className="section-title">In evidenza</p>
+        </div>
+        {status === 'loading' && (
+          <section className="notice">Caricamento pagine in evidenza dall'API...</section>
+        )}
 
-      {status === 'error' && (
-        <section className="notice notice-error">
-          Impossibile raggiungere il backend. Avvia l'API Rust sulla porta 23051 e aggiorna.
-        </section>
-      )}
+        {status === 'error' && (
+          <section className="notice notice-error">
+            Impossibile raggiungere il backend. Avvia l'API Rust sulla porta 23051 e aggiorna.
+          </section>
+        )}
 
-      {status === 'ready' && (
-        <section className="cards-grid" aria-label="Pagine in evidenza">
-          {featuredPages.map((page, index) => {
-            return (
-              <PageCard
-                animationDelayMs={index * 90}
-                coverImageSrc={page.cover_image ? resolveCoverImageSrc(page.cover_image) : null}
-                formattedUpdatedAt={formatDate(page.updated_at)}
-                key={page.slug}
-                page={page}
-              />
-            )
-          })}
-        </section>
-      )}
+        {status === 'ready' && (
+          <section className="cards-grid" aria-label="Pagine in evidenza">
+            {featuredPages.map((page, index) => {
+              return (
+                <PageCard
+                  animationDelayMs={index * 90}
+                  coverImageSrc={page.cover_image ? resolveCoverImageSrc(page.cover_image) : null}
+                  formattedUpdatedAt={formatDate(page.updated_at)}
+                  key={page.slug}
+                  page={page}
+                />
+              )
+            })}
+          </section>
+        )}
+      </section>
     </>
   )
 }
@@ -347,59 +352,59 @@ function ArticlePage() {
 
   return (
     <div>
-    <article className="article-shell">
-      <div className="article-top-row">
-        <Link className="inline-link article-back-link" to="/">
-          ← Torna alle pagine in evidenza
-        </Link>
+      <article className="article-shell">
+        <div className="article-top-row">
+          <Link className="inline-link article-back-link" to="/">
+            ← Torna alle pagine in evidenza
+          </Link>
 
-        <button
-          className="ui-button qr-download-button"
-          disabled={qrStatus === 'downloading'}
-          onClick={handleDownloadQrCode}
-          type="button"
-        >
-          {qrStatus === 'downloading' ? 'Generazione QR...' : 'Scarica QR'}
-        </button>
-      </div>
+          <button
+            className="ui-button qr-download-button"
+            disabled={qrStatus === 'downloading'}
+            onClick={handleDownloadQrCode}
+            type="button"
+          >
+            {qrStatus === 'downloading' ? 'Generazione QR...' : 'Scarica QR'}
+          </button>
+        </div>
 
-      {qrStatus === 'error' && (
-        <p className="qr-download-error">Impossibile creare il QR in questo momento. Riprova.</p>
-      )}
+        {qrStatus === 'error' && (
+          <p className="qr-download-error">Impossibile creare il QR in questo momento. Riprova.</p>
+        )}
 
-      <header className="article-header">
-        <p className="eyebrow">{page.category}</p>
-        <h1>{page.title}</h1>
-        <p className="lead">{page.summary}</p>
-      </header>
+        <header className="article-header">
+          <p className="eyebrow">{page.category}</p>
+          <h1>{page.title}</h1>
+          <p className="lead">{page.summary}</p>
+        </header>
 
-      {coverImageSrc && <img alt={page.title} className="article-cover" loading="lazy" src={coverImageSrc} />}
+        {coverImageSrc && <img alt={page.title} className="article-cover" loading="lazy" src={coverImageSrc} />}
 
-      <div className="article-meta">
-        <span>Aggiornato {formatDate(page.updated_at)}</span>
-        <span>{page.reading_time_min} min di lettura</span>
-      </div>
+        <div className="article-meta">
+          <span>Aggiornato {formatDate(page.updated_at)}</span>
+          <span>{page.reading_time_min} min di lettura</span>
+        </div>
 
-      <div className="article-content article-markdown">
-        <ReactMarkdown rehypePlugins={[rehypeSanitize]} remarkPlugins={[remarkGfm]}>
-          {page.content_md}
-        </ReactMarkdown>
-      </div>
+        <div className="article-content article-markdown">
+          <ReactMarkdown rehypePlugins={[rehypeSanitize]} remarkPlugins={[remarkGfm]}>
+            {page.content_md}
+          </ReactMarkdown>
+        </div>
 
-      {hasArticleMap && (
-        <InteractiveMap
-          pins={articleMapPins}
-          renderPinPopup={() => (
-            <PageCard
-              className="page-card-popup"
-              coverImageSrc={coverImageSrc}
-              formattedUpdatedAt={formatDate(page.updated_at)}
-              page={page}
-            />
-          )}
-        />
-      )}
-    </article>
+        {hasArticleMap && (
+          <InteractiveMap
+            pins={articleMapPins}
+            renderPinPopup={() => (
+              <PageCard
+                className="page-card-popup"
+                coverImageSrc={coverImageSrc}
+                formattedUpdatedAt={formatDate(page.updated_at)}
+                page={page}
+              />
+            )}
+          />
+        )}
+      </article>
     </div>
   )
 }

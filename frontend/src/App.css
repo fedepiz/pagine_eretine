@@ -144,7 +144,7 @@
   gap: 1rem;
 }
 
-.interactive-map-shell {
+.section-shell {
   border-radius: 18px;
   border: 1px solid var(--border);
   background: #fff;
@@ -154,7 +154,7 @@
   animation: rise 0.6s ease both;
 }
 
-.interactive-map-toolbar {
+.section-toolbar {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -162,7 +162,7 @@
   flex-wrap: wrap;
 }
 
-.interactive-map-title {
+.section-title {
   margin: 0;
   color: var(--ink);
   font-family: var(--heading-font);
