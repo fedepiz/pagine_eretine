@@ -1,11 +1,13 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Link, NavLink, Route, Routes, useNavigate, useParams } from 'react-router-dom'
+import { Link, NavLink, Route, Routes, useParams } from 'react-router-dom'
 import QRCode from 'qrcode'
 import ReactMarkdown from 'react-markdown'
 import rehypeSanitize from 'rehype-sanitize'
 import remarkGfm from 'remark-gfm'
 import { InteractiveMap } from './components/InteractiveMap'
 import type { MapPin } from './components/InteractiveMap'
+import { PageCard } from './components/PageCard'
+import type { PageCardData } from './components/PageCard'
 import './App.css'
 
 function resolveApiBaseUrl(): string {
@@ -45,13 +47,7 @@ interface ApiError extends Error {
   status?: number
 }
 
-interface PageSummary {
-  slug: string
-  title: string
-  summary: string
-  category: string
-  updated_at: string
-  cover_image?: string | null
+interface PageSummary extends PageCardData {
   lat: number
   lon: number
 }
@@ -156,7 +152,6 @@ function formatDate(value: string): string {
 }
 
 function HomePage() {
-  const navigate = useNavigate()
   const [pages, setPages] = useState<PageSummary[]>([])
   const [status, setStatus] = useState<HomeStatus>('loading')
 
@@ -186,6 +181,7 @@ function HomePage() {
   }, [])
 
   const featuredPages = useMemo(() => pages.slice(0, 6), [pages])
+  const pagesBySlug = useMemo(() => new Map(pages.map((page) => [page.slug, page])), [pages])
   const mapPins = useMemo<MapPin[]>(
     () =>
       pages
@@ -198,8 +194,6 @@ function HomePage() {
         )
         .map((page) => ({
           id: `page-${page.slug}`,
-          name: page.title,
-          summary: page.summary,
           slug: page.slug,
           lat: page.lat,
           lng: page.lon,
@@ -219,6 +213,22 @@ function HomePage() {
 
       <InteractiveMap
         pins={mapPins}
+        renderPinPopup={(pin) => {
+          const page = pagesBySlug.get(pin.slug)
+
+          if (!page) {
+            return <p className="interactive-map-message">Pagina non disponibile.</p>
+          }
+
+          return (
+            <PageCard
+              className="page-card-popup"
+              coverImageSrc={page.cover_image ? resolveCoverImageSrc(page.cover_image) : null}
+              formattedUpdatedAt={formatDate(page.updated_at)}
+              page={page}
+            />
+          )
+        }}
       />
 
       {status === 'loading' && (
@@ -234,33 +244,14 @@ function HomePage() {
       {status === 'ready' && (
         <section className="cards-grid" aria-label="Pagine in evidenza">
           {featuredPages.map((page, index) => {
-            const coverImageSrc = page.cover_image ? resolveCoverImageSrc(page.cover_image) : null
-
             return (
-              <article
-                className="page-card"
+              <PageCard
+                animationDelayMs={index * 90}
+                coverImageSrc={page.cover_image ? resolveCoverImageSrc(page.cover_image) : null}
+                formattedUpdatedAt={formatDate(page.updated_at)}
                 key={page.slug}
-                style={
-                  coverImageSrc
-                    ? {
-                      animationDelay: `${index * 90}ms`,
-                      backgroundImage: `linear-gradient(160deg, rgba(255, 255, 255, 0.8), rgba(255, 255, 255, 0.8)), url("${coverImageSrc}")`,
-                      backgroundSize: 'cover',
-                      backgroundPosition: 'center',
-                      backgroundRepeat: 'no-repeat',
-                    }
-                    : { animationDelay: `${index * 90}ms` }
-                }
-              >
-                <p className="page-card-meta">
-                  {page.category} · Aggiornato {formatDate(page.updated_at)}
-                </p>
-                <h2>{page.title}</h2>
-                <p>{page.summary}</p>
-                <Link className="inline-link" to={`/p/${page.slug}`}>
-                  Vai alla pagina
-                </Link>
-              </article>
+                page={page}
+              />
             )
           })}
         </section>

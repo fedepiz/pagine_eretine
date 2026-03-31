@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useState } from 'react'
+import type { ReactNode } from 'react'
 import type { LatLngExpression } from 'leaflet'
 import L from 'leaflet'
 import markerIcon2x from 'leaflet/dist/images/marker-icon-2x.png'
 import markerIcon from 'leaflet/dist/images/marker-icon.png'
 import markerShadow from 'leaflet/dist/images/marker-shadow.png'
-import { Link } from 'react-router-dom'
 import { Circle, MapContainer, Marker, Popup, TileLayer, useMap } from 'react-leaflet'
 
 const DEFAULT_CENTER: [number, number] = [42.05035, 12.61569]
@@ -34,8 +34,6 @@ configureDefaultMarkerIcon()
 
 export interface MapPin {
   id: string
-  name: string
-  summary: string,
   slug: string
   lat: number
   lng: number
@@ -46,6 +44,8 @@ interface InteractiveMapProps {
   initialCenter?: [number, number]
   initialZoom?: number
   showUserLocationControl?: boolean
+  renderPinPopup?: (pin: MapPin) => ReactNode
+  onPinClick?: (pin: MapPin) => void
 }
 
 type GeoStatus = 'idle' | 'locating' | 'denied' | 'unsupported' | 'error'
@@ -96,6 +96,8 @@ export function InteractiveMap({
   initialCenter = DEFAULT_CENTER,
   initialZoom = DEFAULT_ZOOM,
   showUserLocationControl = true,
+  renderPinPopup,
+  onPinClick,
 }: InteractiveMapProps) {
   const [geoStatus, setGeoStatus] = useState<GeoStatus>('idle')
   const [userLocation, setUserLocation] = useState<[number, number] | null>(null)
@@ -158,15 +160,27 @@ export function InteractiveMap({
         <FlyToUserLocation userLocation={userLocation} />
 
         {pins.map((pin) => (
-          <Marker key={pin.id} position={[pin.lat, pin.lng]}>
+          <Marker
+            eventHandlers={
+              onPinClick
+                ? {
+                  click: () => {
+                    onPinClick(pin)
+                  },
+                }
+                : undefined
+            }
+            key={pin.id}
+            position={[pin.lat, pin.lng]}
+          >
             <Popup>
-              <div className="interactive-map-popup">
-                <p>{pin.name}</p>
-                <span>{pin.summary}</span>
-                <Link className="inline-link" to={`/p/${pin.slug}`}>
-                  Vai alla pagina
-                </Link>
-              </div>
+              {renderPinPopup ? (
+                renderPinPopup(pin)
+              ) : (
+                <div className="interactive-map-popup">
+                  <p>{pin.slug}</p>
+                </div>
+              )}
             </Popup>
           </Marker>
         ))}

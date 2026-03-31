@@ -196,6 +196,14 @@
   font-size: 0.84rem;
 }
 
+.leaflet-popup-content-wrapper {
+  border-radius: 18px;
+}
+
+.leaflet-popup-content {
+  margin: 0.65rem;
+}
+
 .interactive-map-popup button {
   border: 1px solid var(--border);
   background: #fff;
@@ -227,6 +235,12 @@
   background: #fff;
   padding: 1rem;
   animation: rise 0.6s ease both;
+}
+
+.page-card-popup {
+  margin: 0;
+  width: min(280px, calc(100vw - 5rem));
+  animation: none;
 }
 
 .page-card-meta {
