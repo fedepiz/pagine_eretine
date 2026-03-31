@@ -41,6 +41,7 @@ body {
   min-height: 100vh;
 }
 
-a {
-  color: inherit;
+a,
+a:visited {
+  color: var(--link);
 }

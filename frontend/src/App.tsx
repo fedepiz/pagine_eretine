@@ -151,6 +151,10 @@ function formatDate(value: string): string {
   })
 }
 
+function hasValidCoordinates(lat: number, lon: number): boolean {
+  return Number.isFinite(lat) && Number.isFinite(lon) && lat !== 0 && lon !== 0
+}
+
 function HomePage() {
   const [pages, setPages] = useState<PageSummary[]>([])
   const [status, setStatus] = useState<HomeStatus>('loading')
@@ -186,11 +190,7 @@ function HomePage() {
     () =>
       pages
         .filter(
-          (page) =>
-            Number.isFinite(page.lat) &&
-            Number.isFinite(page.lon) &&
-            page.lat !== 0 &&
-            page.lon !== 0,
+          (page) => hasValidCoordinates(page.lat, page.lon),
         )
         .map((page) => ({
           id: `page-${page.slug}`,
@@ -326,6 +326,10 @@ function ArticlePage() {
   }
 
   const coverImageSrc = page.cover_image ? resolveCoverImageSrc(page.cover_image) : null
+  const hasArticleMap = hasValidCoordinates(page.lat, page.lon)
+  const articleMapPins: MapPin[] = hasArticleMap
+    ? [{ id: `article-${page.slug}`, slug: page.slug, lat: page.lat, lng: page.lon }]
+    : []
 
   const handleDownloadQrCode = async () => {
     if (!slug || qrStatus === 'downloading') {
@@ -342,6 +346,7 @@ function ArticlePage() {
   }
 
   return (
+    <div>
     <article className="article-shell">
       <div className="article-top-row">
         <Link className="inline-link article-back-link" to="/">
@@ -380,7 +385,22 @@ function ArticlePage() {
           {page.content_md}
         </ReactMarkdown>
       </div>
+
+      {hasArticleMap && (
+        <InteractiveMap
+          pins={articleMapPins}
+          renderPinPopup={() => (
+            <PageCard
+              className="page-card-popup"
+              coverImageSrc={coverImageSrc}
+              formattedUpdatedAt={formatDate(page.updated_at)}
+              page={page}
+            />
+          )}
+        />
+      )}
     </article>
+    </div>
   )
 }
 

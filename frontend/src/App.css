@@ -22,7 +22,8 @@
   background: linear-gradient(90deg, rgba(246, 242, 230, 0.95), rgba(250, 247, 240, 0.8));
 }
 
-.brand {
+.brand,
+.brand:visited {
   color: var(--ink);
   text-decoration: none;
   font-family: var(--heading-font);
@@ -34,7 +35,8 @@
   gap: 0.6rem;
 }
 
-.top-nav-link {
+.top-nav-link,
+.top-nav-link:visited {
   text-decoration: none;
   color: var(--ink);
   padding: 0.45rem 0.75rem;
@@ -179,6 +181,20 @@
   border: 1px solid var(--border);
 }
 
+.map-pin {
+  border-radius: 999px;
+  border: 2px solid #fff;
+  box-shadow: 0 0 0 1px rgba(48, 61, 70, 0.38), 0 3px 10px rgba(23, 28, 31, 0.28);
+}
+
+.map-pin-page {
+  background: #5f8fb5;
+}
+
+.map-pin-user {
+  background: #9ab6a5;
+}
+
 .interactive-map-popup {
   display: grid;
   gap: 0.42rem;
@@ -272,6 +288,11 @@
 
 .inline-link:hover {
   text-decoration: underline;
+}
+
+.leaflet-container a,
+.leaflet-container a:visited {
+  color: var(--link);
 }
 
 .article-shell {
