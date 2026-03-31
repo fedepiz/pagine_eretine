@@ -337,7 +337,7 @@ function App() {
 
       <footer className="footer">
         <p>
-          Sviluppato da Rotari Club Monterotondo, 2026. Tutti i diritti riservati.
+          Versione in sviluppo. I contenuti di questa pagina sono segnaposti di prova generati con intelligenza artificiale.
         </p>
       </footer>
     </div>
