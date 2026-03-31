@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, NavLink, Route, Routes, useParams } from 'react-router-dom'
+import QRCode from 'qrcode'
 import ReactMarkdown from 'react-markdown'
 import rehypeSanitize from 'rehype-sanitize'
 import remarkGfm from 'remark-gfm'
@@ -31,9 +32,12 @@ function resolveApiBaseUrl(): string {
 }
 
 const API_BASE_URL = resolveApiBaseUrl()
+const QR_COLOR_DARK = '#2b2b2b'
+const QR_COLOR_LIGHT = '#ffffff'
 
 type HomeStatus = 'loading' | 'ready' | 'error'
 type ArticleStatus = 'loading' | 'ready' | 'not-found' | 'error'
+type QrDownloadStatus = 'idle' | 'downloading' | 'error'
 
 interface ApiError extends Error {
   status?: number
@@ -63,6 +67,37 @@ async function apiFetch<T>(path: string): Promise<T> {
   }
 
   return response.json() as Promise<T>
+}
+
+function resolvePagePublicUrl(slug: string): string {
+  const normalizedBaseUrl = `${window.location.origin.replace(/\/+$/, '')}/`
+
+  try {
+    return new URL(`p/${encodeURIComponent(slug)}`, normalizedBaseUrl).toString()
+  } catch {
+    return `${window.location.origin.replace(/\/+$/, '')}/p/${encodeURIComponent(slug)}`
+  }
+}
+
+async function downloadPageQrCode(slug: string): Promise<void> {
+  const pageUrl = resolvePagePublicUrl(slug)
+  const dataUrl = await QRCode.toDataURL(pageUrl, {
+    width: 1024,
+    margin: 1,
+    errorCorrectionLevel: 'M',
+    color: {
+      dark: QR_COLOR_DARK,
+      light: QR_COLOR_LIGHT,
+    },
+  })
+
+  const link = document.createElement('a')
+  link.href = dataUrl
+  link.download = `qr-${slug}.png`
+
+  document.body.append(link)
+  link.click()
+  link.remove()
 }
 
 function resolveCoverImageSrc(rawValue: string): string {
@@ -210,6 +245,7 @@ function ArticlePage() {
   const missingSlug = !slug
   const [page, setPage] = useState<Page | null>(null)
   const [status, setStatus] = useState<ArticleStatus>('loading')
+  const [qrStatus, setQrStatus] = useState<QrDownloadStatus>('idle')
 
   useEffect(() => {
     if (missingSlug) {
@@ -271,11 +307,40 @@ function ArticlePage() {
 
   const coverImageSrc = page.cover_image ? resolveCoverImageSrc(page.cover_image) : null
 
+  const handleDownloadQrCode = async () => {
+    if (!slug || qrStatus === 'downloading') {
+      return
+    }
+
+    try {
+      setQrStatus('downloading')
+      await downloadPageQrCode(slug)
+      setQrStatus('idle')
+    } catch {
+      setQrStatus('error')
+    }
+  }
+
   return (
     <article className="article-shell">
-      <Link className="inline-link" to="/">
-        ← Torna alle pagine in evidenza
-      </Link>
+      <div className="article-top-row">
+        <Link className="inline-link article-back-link" to="/">
+          ← Torna alle pagine in evidenza
+        </Link>
+
+        <button
+          className="qr-download-button"
+          disabled={qrStatus === 'downloading'}
+          onClick={handleDownloadQrCode}
+          type="button"
+        >
+          {qrStatus === 'downloading' ? 'Generazione QR...' : 'Scarica QR'}
+        </button>
+      </div>
+
+      {qrStatus === 'error' && (
+        <p className="qr-download-error">Impossibile creare il QR in questo momento. Riprova.</p>
+      )}
 
       <header className="article-header">
         <p className="eyebrow">{page.category}</p>
